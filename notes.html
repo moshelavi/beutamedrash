@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מחברת חידושי תורה</title>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Heebo', sans-serif; margin: 0; padding: 0; background: #f8fafc; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 250px; background: #fff; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; }
+        .main-content { flex: 1; display: flex; flex-direction: column; background: #fffbeb; position: relative; }
+        .header { padding: 15px; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .note-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .note-item { padding: 10px; border-radius: 8px; cursor: pointer; margin-bottom: 5px; transition: 0.2s; border: 1px solid transparent; }
+        .note-item:hover { background: #f1f5f9; }
+        .note-item.active { background: #e0f2fe; border-color: #3b82f6; color: #0369a1; font-weight: bold; }
+        .editor { flex: 1; padding: 40px; outline: none; font-size: 1.1rem; line-height: 1.6; overflow-y: auto; background-image: linear-gradient(#e5e7eb 1px, transparent 1px); background-size: 100% 2rem; margin-top: 2rem; }
+        .toolbar { padding: 10px; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; gap: 10px; }
+        .btn { background: #3b82f6; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; gap: 5px; }
+        .btn:hover { opacity: 0.9; }
+        .btn-outline { background: transparent; border: 1px solid #ccc; color: #333; }
+        .paper-holes { position: absolute; right: 20px; top: 0; bottom: 0; width: 40px; display: flex; flex-direction: column; gap: 40px; padding-top: 50px; pointer-events: none; }
+        .hole { width: 15px; height: 15px; background: #f1f5f9; border-radius: 50%; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="header">
+        <h3 style="margin:0;">חידושים</h3>
+        <button class="btn" onclick="createNewNote()" style="padding: 5px 10px;"><i class="fas fa-plus"></i></button>
+    </div>
+    <div class="note-list" id="noteList">
+        <!-- Notes will be injected here -->
+    </div>
+    <div style="padding: 15px; border-top: 1px solid #e2e8f0; font-size: 0.85rem; color: #64748b;">
+        <div id="partnerInfo" style="display:none;">
+            <i class="fas fa-user-friends"></i> משותף עם <span id="partnerName" style="font-weight:bold;"></span>
+        </div>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="toolbar">
+        <button class="btn" onclick="saveCurrentNote()"><i class="fas fa-save"></i> שמור</button>
+        <button class="btn btn-outline" onclick="deleteCurrentNote()" style="color:#ef4444; border-color:#ef4444;"><i class="fas fa-trash"></i> מחק</button>
+        <div style="flex:1;"></div>
+        <button class="btn" style="background:#16a34a;" onclick="shareWithPartner()" id="shareBtn" style="display:none;"><i class="fas fa-share-alt"></i> שתף עם חברותא</button>
+    </div>
+    <div class="paper-holes">
+        <div class="hole"></div><div class="hole"></div><div class="hole"></div><div class="hole"></div><div class="hole"></div><div class="hole"></div><div class="hole"></div><div class="hole"></div>
+    </div>
+    <div class="editor" id="editor" contenteditable="true" placeholder="כתוב כאן את חידושי התורה שלך..."></div>
+</div>
+
+<script>
+    let context = JSON.parse(localStorage.getItem('current_notes_context') || '{}');
+    let notes = context.notes || [];
+    let activeNoteIndex = -1;
+
+    function init() {
+        if (context.partnerName) {
+            document.getElementById('partnerInfo').style.display = 'block';
+            document.getElementById('partnerName').innerText = context.partnerName;
+            document.getElementById('shareBtn').style.display = 'flex';
+        }
+        renderList();
+        if (notes.length > 0) selectNote(0);
+        else createNewNote();
+    }
+
+    function renderList() {
+        const list = document.getElementById('noteList');
+        list.innerHTML = '';
+        notes.forEach((note, index) => {
+            const div = document.createElement('div');
+            div.className = `note-item ${index === activeNoteIndex ? 'active' : ''}`;
+            // Extract title from first line or use default
+            const title = note.content.split('\n')[0].substring(0, 20) || 'חידוש חדש';
+            div.innerText = title;
+            div.onclick = () => selectNote(index);
+            list.appendChild(div);
+        });
+    }
+
+    function selectNote(index) {
+        if (activeNoteIndex !== -1) saveCurrentNote(); // Save previous before switching
+        activeNoteIndex = index;
+        document.getElementById('editor').innerText = notes[index].content;
+        renderList();
+    }
+
+    function createNewNote() {
+        if (activeNoteIndex !== -1) saveCurrentNote();
+        notes.push({ content: 'כותרת: חידוש חדש\n\n' });
+        activeNoteIndex = notes.length - 1;
+        selectNote(activeNoteIndex);
+    }
+
+    function saveCurrentNote() {
+        if (activeNoteIndex === -1) return;
+        const content = document.getElementById('editor').innerText;
+        notes[activeNoteIndex].content = content;
+        renderList();
+        
+        // Update context and save to parent app via localStorage/API
+        context.notes = notes;
+        localStorage.setItem('current_notes_context', JSON.stringify(context));
+        
+        // Notify parent to save to DB
+        // We can't access parent functions directly easily if cross-origin, but here it's same origin.
+        // Or we can use window.parent.updateGoalNotes(context.goalId, notes);
+        if (window.parent && window.parent.updateGoalNotes) {
+            window.parent.updateGoalNotes(context.goalId, notes);
+        }
+    }
+
+    function deleteCurrentNote() {
+        if (activeNoteIndex === -1) return;
+        if (!confirm('למחוק את החידוש הזה?')) return;
+        notes.splice(activeNoteIndex, 1);
+        activeNoteIndex = -1;
+        renderList();
+        if (notes.length > 0) selectNote(0);
+        else createNewNote();
+        saveCurrentNote(); // To sync deletion
+    }
+
+    function shareWithPartner() {
+        alert('החידושים משותפים אוטומטית עם החברותא שלך!');
+    }
+
+    // Auto save every 5 seconds
+    setInterval(saveCurrentNote, 5000);
+
+    init();
+</script>
+</body>
+</html>
